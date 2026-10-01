@@ -1,0 +1,10 @@
+*.exe
+*.o
+*.mod
+*.png
+patch_dynamic.py
+patch_omp.py
+refactor.py
+test.f90
+test.o
+squa4.out

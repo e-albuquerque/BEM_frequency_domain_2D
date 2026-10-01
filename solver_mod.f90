@@ -1,0 +1,41 @@
+MODULE solver_mod
+  IMPLICIT NONE
+
+CONTAINS
+
+  SUBROUTINE CSOLVER(A,B,N,NX)
+    INTEGER, INTENT(IN) :: N, NX
+    COMPLEX, INTENT(INOUT) :: A(NX,NX), B(NX)
+    INTEGER, ALLOCATABLE :: IPIV(:)
+    INTEGER :: INFO
+
+    ALLOCATE(IPIV(N))
+    CALL CGESV(N, 1, A, NX, IPIV, B, NX, INFO)
+    IF (INFO /= 0) THEN
+      WRITE(*,*) 'CGESV ERROR: ', INFO
+      STOP 'SOLVER : STOP SINGULARITY'
+    END IF
+    DEALLOCATE(IPIV)
+  END SUBROUTINE CSOLVER
+
+  FUNCTION CDOT(N,U,IUX,V,IVX) RESULT(RES)
+    INTEGER, INTENT(IN) :: N, IUX, IVX
+    COMPLEX, INTENT(IN) :: U(*), V(*)
+    COMPLEX :: RES
+    INTEGER :: I, IU, IV
+
+    RES = (0.0, 0.0)
+    IF (N <= 0) RETURN
+    IU = 1
+    IV = 1
+    IF (IUX < 0) IU = 1 - (N-1)*IUX
+    IF (IVX < 0) IV = 1 - (N-1)*IVX
+    DO I = 1, N
+      RES = RES + U(IU) * V(IV)
+      IU = IU + IUX
+      IV = IV + IVX
+    END DO
+
+  END FUNCTION CDOT
+
+END MODULE solver_mod
