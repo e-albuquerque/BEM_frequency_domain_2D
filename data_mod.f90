@@ -1,6 +1,6 @@
 MODULE data_mod
   IMPLICIT NONE
-  INTEGER :: N, L, INP, IPR, NE, NFR
+  INTEGER :: N, L, INP, IPR, ISD, NE, NFR, NODE
   COMPLEX :: CP, CS, GE
   REAL :: RO, XNU, FR
 

@@ -255,7 +255,8 @@ def show_geometry(nodes,xplot,yplot,elem):
 
     plt.savefig("geometry.png")
 
-def create_input_file(filename, computed_data, int_points, normal_vectors, type_bcs, val_bcs, input_params, frequencies):
+def create_input_file(filename, computed_data, int_points, normal_vectors, type_bcs, \
+                       val_bcs, input_params, frequencies, mid_node_number):
     """
     Creates an input file for the Fortran BEM program based on computed mesh data
     and boundary conditions.
@@ -306,7 +307,9 @@ def create_input_file(filename, computed_data, int_points, normal_vectors, type_
         # 6. Internal Points Coordinates Lines (all on one line, formatted to match squa4.dat)
         int_points_str = " ".join(f"{p[0]:.1f}  {p[1]:.1f}" for p in int_points)
         f.write(" " + int_points_str + "\n")
-        f.write("\n") # Add one more newline as seen in example
+        # 7. Node where displacements and tractions will be saved in specific files
+        f.write(f" {mid_node_number+1}\n")
+
 
 
 
@@ -336,6 +339,40 @@ frequencies = [10., 40., 70.]
 
 show_geometry(computed_data['coordinates'],xplot,yplot,computed_data['elements'],)
 
+
+def get_midnode_edge(computed_data, edge):
+    # Get the segment ID for the specified edge
+    segment_id = computed_data['bc_info'][edge]['segment']
+
+    # Filter elements that belong to this segment
+    mask = computed_data['segments'] == segment_id
+    
+    # Get global indices of the elements for this edge
+    global_indices = np.where(mask)[0]
+    n_elements = len(global_indices)
+
+    if n_elements % 2 != 0:
+        # Ímpar: o nó central é o nó do meio do elemento central
+        local_mid_idx = n_elements // 2
+        global_mid_idx = global_indices[local_mid_idx]
+        mid_element = computed_data['elements'][global_mid_idx]
+        
+        # Para Gmsh line3 [start, end, mid], o nó do meio é o índice 2
+        mid_node = mid_element[2]
+    else:
+        # Par: o nó central da aresta é o nó compartilhado pelos dois elementos centrais.
+        # Pegamos o elemento da esquerda (onde o nó é o nó final/terceiro nó).
+        local_mid_idx = (n_elements // 2) - 1
+        global_mid_idx = global_indices[local_mid_idx]
+        mid_element = computed_data['elements'][global_mid_idx]
+        
+        # O nó final do elemento (terceiro nó) fica no índice 1
+        mid_node = mid_element[1]
+
+    return mid_node, global_mid_idx
+
+edge = 'right'
+
 # Re-get the global `inp_data` dictionary to avoid shadowing
 global_input_data = input_data()
 
@@ -343,6 +380,10 @@ inp_data_filename='squa4.dat' # This is the output file name
 int_points=np.array([[3.,1.],[3.,2.],[3.,3.],[3.,4.],[3.,5.]])
 
 frequencies = [10., 40., 70.]
+
+
+mid_node_number, mid_element_idx = get_midnode_edge(computed_data, edge)
+
 
 import numpy as np
 
@@ -354,4 +395,5 @@ int_points=np.array([[3.,1.],[3.,2.],[3.,3.],[3.,4.],[3.,5.]])
 
 
 # Call the function with the correct arguments
-create_input_file(inp_data_filename, computed_data, int_points, normal, type_bcs, val_bcs, global_input_data, frequencies)
+create_input_file(inp_data_filename, computed_data, int_points, normal, \
+                  type_bcs, val_bcs, global_input_data, frequencies, mid_node_number)
