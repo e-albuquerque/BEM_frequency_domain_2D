@@ -1,5 +1,5 @@
 FC = gfortran
-FFLAGS = -O3 -fopenmp
+FFLAGS = -O3 -fopenmp -fdefault-real-8
 LIBS = -llapack -lblas
 TARGET = quadpleh_modern.exe
 
