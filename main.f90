@@ -19,7 +19,7 @@
 !  NFM=MAXIMUM NUMBER OF FREQUENCIES
 !
 !
-      CHARACTER*12 FILEIN,FILEOUT,FILEISD
+      CHARACTER*15 FILEIN,FILEOUT,FILEISD
       CHARACTER*80 TITLE
       INTEGER :: NNE, NX, NX1, NPM, NFM, I, J, NN
       REAL :: RGE, DAM
@@ -42,7 +42,7 @@
 !      READ(*,'  (A) ')FILEIN
       FILEIN='squa4.dat'
       FILEOUT='squa4.out'
-      FILEISD='disp.dat'      
+      FILEISD='disp_trac.dat'      
       OPEN(INP,FILE=FILEIN,STATUS='OLD')
 !      WRITE(*,' (A) ') ' NAME OF OUTPUT FILE (MAX. 12 CHART.)'
 !      READ(*,' (A) ')FILEOUT
@@ -102,7 +102,7 @@
 !
       CALL OUTPUT4(X,Y,FI,DFI,CX,CY,DSOL)
 
-      CALL SAVE_DISP(NODE,FI)
+      CALL SAVE_DISP_TRAC(NODE,FI,DFI)
    60 CONTINUE
 !
 !   CLOSE INPUT AND OUTPUT FILES

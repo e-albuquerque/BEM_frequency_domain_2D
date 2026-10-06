@@ -30,10 +30,10 @@ def input_data():
         'top': {'type_x': 1, 'value_x': [0,0], 'type_y': 1, 'value_y': [100,0]},
         'left': {'type_x': 0, 'value_x': [0,0], 'type_y': 1, 'value_y': [0,0]}
     }
-    E = 200.0e9 # # Elastic modulus
-    nu = 0.3 # Poisson ration
+    E = 250.0e4 # # Elastic modulus
+    nu = 0.25 # Poisson ration
     file_name = 'placa'
-    rho = 7850 # density
+    rho = 100 # density
     damp = 0.05 # damping
 
     return {'bound_cond': bound_cond, 'E': E, 'nu': nu, 'file_name': file_name,\
@@ -255,8 +255,21 @@ def show_geometry(nodes,xplot,yplot,elem):
 
     plt.savefig("geometry.png")
 
-def create_input_file(filename, computed_data, int_points, normal_vectors, type_bcs, \
-                       val_bcs, input_params, frequencies, mid_node_number):
+# Re-get the global `inp_data` dictionary to avoid shadowing
+global_input_data = input_data()
+
+inp_data_filename='squa4.dat'
+int_points=np.array([[3.,1.],[3.,2.],[3.,3.],[3.,4.],[3.,5.]])
+
+def format_coord(val):
+    # Arredonda para evitar problemas de precisão numérica do Gmsh (ex: 2.999999999999 -> 3.0)
+    val_rounded = round(val, 4)
+    if val_rounded.is_integer():
+        return f"{int(val_rounded)}."
+    return f"{val_rounded}"
+
+def create_input_file(filename, computed_data, int_points, normal_vectors, \
+                      type_bcs, val_bcs, input_params, frequencies, mid_element_idx):
     """
     Creates an input file for the Fortran BEM program based on computed mesh data
     and boundary conditions.
@@ -271,7 +284,7 @@ def create_input_file(filename, computed_data, int_points, normal_vectors, type_
         num_elements = elements.shape[0]
         num_internal_points = int_points.shape[0]
 
-        # Frequencies (hardcoded as per example squa4.dat)
+        # Frequencies
         num_frequencies = len(frequencies)
 
         shear_modulus_real = input_params['E'] / (2 * (1 + input_params['nu']))
@@ -280,17 +293,29 @@ def create_input_file(filename, computed_data, int_points, normal_vectors, type_
         poisson_ratio = input_params['nu']
 
         # 2. Basic Parameter Line (formatted to match squa4.dat)
-        f.write(f" {num_elements},{num_internal_points},{num_frequencies},{shear_modulus_real:.1f},{damping_ratio:.2f},{density:.1f},{poisson_ratio:.2f}\n")
+        f.write(f" {num_elements},{num_internal_points},{num_frequencies},\
+        {shear_modulus_real:.1f},{damping_ratio:.2f},{density:.1f},\
+        {poisson_ratio:.2f}\n")
 
         # 3. Frequencies Line
         f.write(" ")
         f.write(" ".join(f"{freq:.1f}" for freq in frequencies))
         f.write("\n")
 
-        # 4. Boundary Nodes Coordinates Lines (dynamically writing all nodes)
-        f.write(" ")
-        node_coords_str = " ".join(f"{coord[0]:.1f}  {coord[1]:.1f}" for coord in nodes)
-        f.write(node_coords_str + "\n")
+        # 4. Boundary Nodes Coordinates Lines
+        # Sequência geométrica desejada: no1 e no_meio de cada elemento
+        node_coords_list = []
+        for elem in elements:
+            no1_idx = elem[0]
+            no_meio_idx = elem[2]
+            x1, y1 = nodes[no1_idx][0], nodes[no1_idx][1]
+            xm, ym = nodes[no_meio_idx][0], nodes[no_meio_idx][1]
+            node_coords_list.append(f"{format_coord(x1)}  {format_coord(y1)}")
+            node_coords_list.append(f"{format_coord(xm)}  {format_coord(ym)}")
+
+        # Junta os pares usando o mesmo espaçamento largo do arquivo squa4.dat original
+        node_coords_str = "  ".join(node_coords_list)
+        f.write("  " + node_coords_str + "\n")
 
         # 5. Boundary Conditions Lines
         for i in range(num_elements):
@@ -304,19 +329,12 @@ def create_input_file(filename, computed_data, int_points, normal_vectors, type_
             f.write(f"{type_bcs[i, 3]} ({val_bcs[i, 3].real:.1f},{val_bcs[i, 3].imag:.1f})   ")
             f.write(f"{type_bcs[i, 5]} ({val_bcs[i, 5].real:.1f},{val_bcs[i, 5].imag:.1f})\n")
 
-        # 6. Internal Points Coordinates Lines (all on one line, formatted to match squa4.dat)
+        # 6. Internal Points Coordinates Lines
         int_points_str = " ".join(f"{p[0]:.1f}  {p[1]:.1f}" for p in int_points)
         f.write(" " + int_points_str + "\n")
-        # 7. Node where displacements and tractions will be saved in specific files
-        f.write(f" {mid_node_number+1}\n")
 
-
-
-
-
-
-
-
+        # 7. Node where displacements and tractions will be saved
+        f.write(f" {2*(mid_element_idx)+1}\n")
 
 
 
@@ -335,7 +353,6 @@ normal,xplot,yplot = comp_normal(computed_data['elements'], computed_data['coord
 type_bcs,val_bcs = mount_bcs(computed_data['segments'], computed_data['bc_info'])
 
 
-frequencies = [10., 40., 70.]
 
 show_geometry(computed_data['coordinates'],xplot,yplot,computed_data['elements'],)
 
@@ -346,7 +363,7 @@ def get_midnode_edge(computed_data, edge):
 
     # Filter elements that belong to this segment
     mask = computed_data['segments'] == segment_id
-    
+
     # Get global indices of the elements for this edge
     global_indices = np.where(mask)[0]
     n_elements = len(global_indices)
@@ -356,7 +373,7 @@ def get_midnode_edge(computed_data, edge):
         local_mid_idx = n_elements // 2
         global_mid_idx = global_indices[local_mid_idx]
         mid_element = computed_data['elements'][global_mid_idx]
-        
+
         # Para Gmsh line3 [start, end, mid], o nó do meio é o índice 2
         mid_node = mid_element[2]
     else:
@@ -365,13 +382,16 @@ def get_midnode_edge(computed_data, edge):
         local_mid_idx = (n_elements // 2) - 1
         global_mid_idx = global_indices[local_mid_idx]
         mid_element = computed_data['elements'][global_mid_idx]
-        
+
         # O nó final do elemento (terceiro nó) fica no índice 1
         mid_node = mid_element[1]
 
     return mid_node, global_mid_idx
 
-edge = 'right'
+edge = 'top'
+mid_node_number, mid_element_idx = get_midnode_edge(computed_data, edge)
+print(f"Mid node number for '{edge}' edge: {mid_node_number}")
+print(f"Mid element number for '{edge}' edge: {mid_element_idx}")
 
 # Re-get the global `inp_data` dictionary to avoid shadowing
 global_input_data = input_data()
@@ -379,7 +399,7 @@ global_input_data = input_data()
 inp_data_filename='squa4.dat' # This is the output file name
 int_points=np.array([[3.,1.],[3.,2.],[3.,3.],[3.,4.],[3.,5.]])
 
-frequencies = [10., 40., 70.]
+frequencies = np.linspace(10.,150.,30)
 
 
 mid_node_number, mid_element_idx = get_midnode_edge(computed_data, edge)
@@ -396,4 +416,6 @@ int_points=np.array([[3.,1.],[3.,2.],[3.,3.],[3.,4.],[3.,5.]])
 
 # Call the function with the correct arguments
 create_input_file(inp_data_filename, computed_data, int_points, normal, \
-                  type_bcs, val_bcs, global_input_data, frequencies, mid_node_number)
+                  type_bcs, val_bcs, global_input_data, frequencies, mid_element_idx)
+
+
