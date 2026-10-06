@@ -164,9 +164,15 @@ SUBROUTINE INPUT_DATA()
 
 
       SUBROUTINE SAVE_DISP_TRAC(NODE,FI,DFI)
-      INTEGER NODE
+      INTEGER NODE, I
       COMPLEX FI(1),DFI(1)
-      WRITE(ISD,*)  FI(2*NODE-1), FI(2*NODE), DFI(6*NODE-3), DFI(6*NODE-2)
+      IF (MOD(NODE, 2) == 0) THEN
+          I = NODE / 2
+          WRITE(ISD,*)  FI(2*NODE-1), FI(2*NODE), DFI(6*I-3), DFI(6*I-2)
+      ELSE
+          I = (NODE + 1) / 2
+          WRITE(ISD,*)  FI(2*NODE-1), FI(2*NODE), DFI(6*I-5), DFI(6*I-4)
+      END IF
       RETURN
       END
 
